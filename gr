@@ -1,0 +1,99 @@
+#!/usr/bin/ruby
+
+END {
+    handlers = {
+        "lg" => method(:lg),
+        "pr" => method(:pr),
+        "mg" => method(:mg),
+    }
+
+    action, *args = *ARGV
+    raise "❌ Usage: #{$0} <action>
+Available actions: #{handlers.keys.join(", ")}" if action.nil?
+
+    handler = handlers[action]
+    unless handler.nil? then
+        handler.call(action, args)
+    else
+        raise "❌ Unrecognized action `#{action}`
+Available actions: #{handlers.keys.join(", ")}"
+        exit 1
+    end
+}
+
+def lg(action, args)
+    sh("git log --decorate --graph --oneline '#{args.join(" ")}'")
+end
+
+require "tempfile"
+
+def pr(action, args)
+    description = nil
+    file = Tempfile.new
+    begin
+        branch = `git branch --show-current`.chomp
+        matched = branch.match(/^(T\d+)(.*)$/)
+        tid, title = matched.nil? ? ["", ""] : matched.captures
+        title = title.gsub(/[_\[\]]/, " ").gsub(/ (\w)/) { " #{$1.upcase}" }.strip
+        File.write(file.path, "[#{tid}] #{title}
+
+# Description:
+
+[Phabricator Ticket](https://grindr.phacility.com/#{tid})
+
+Please include a summary of the change and which issue is fixed. 
+
+Please also include relevant motivation and context. 
+
+List any dependencies that are required for this change.
+
+
+# Test Plan:
+
+Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce.
+
+
+# Checklist:
+
+- [] I have performed a self-review of my own code
+- [] I have commented my code, particularly in hard-to-understand areas
+- [] I have made corresponding changes to the documentation
+- [] My changes generate no new warnings")
+
+        loop do
+            sh("vim #{file.path}")
+            description = File.read(file.path)
+            title = description.lines.first.chomp
+            description = description.lines.to_a[2..-1].join.chomp
+            break if title =~ /^\[T\d+\].*$/
+            exit 1 if input("Mismatched title format. Edit again? (default: true)", optional: true) =~ /^[Nn]([oO])?$/
+        end
+    ensure
+        file.close
+        file.unlink
+    end
+
+    base = input("Enter the PR target branch (default: master)", optional = true)
+    sh("gh pr create --base '#{base}' --title '#{title}' --body='#{description.sub(/'/, '"')}'")
+end
+
+def mg(action, args)
+    sh("gh pr merge -s")
+    sh("git pull")
+end
+
+def sh(cmd)
+    puts "🤖 #{cmd}"
+    raise "❌ Exit code #{$?.exitstatus}" unless system(cmd)
+end
+
+require "readline"
+
+def input(msg, optional = false)
+    value = Readline.readline("#{msg}: ").chomp
+    if not optional and value.empty? then
+        input(msg, optional)
+    else
+        value
+    end
+end
