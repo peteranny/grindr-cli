@@ -87,7 +87,9 @@ Please describe the tests that you ran to verify your changes. Provide instructi
         file.unlink
     end
 
-    base = input("Enter the PR target branch (default: master)", optional = true)
+    branches = `git remote update -p && git for-each-ref --format='%(refname:short)' git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/*`.split("\n").reject do |br| br =~ /^release/ end
+    base = choice("Please choose the target branch", branches)
+
     sh("gh pr create --base '#{base}' --title '#{title}' --body='#{description.sub(/'/, '"')}'")
 end
 
@@ -110,5 +112,15 @@ def input(msg, optional = false)
         input(msg, optional)
     else
         value
+    end
+end
+
+require "highline"
+
+def choice(title, choices)
+    HighLine.new.choose do |menu|
+        menu.shell = true
+        menu.prompt = "#{title} (enter the option itself or its number): "
+        menu.choices(*choices)
     end
 end
