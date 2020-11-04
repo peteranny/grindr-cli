@@ -3,6 +3,7 @@
 END {
     handlers = {
         "lg" => method(:lg),
+        "ft" => method(:ft),
         "pr" => method(:pr),
         "mg" => method(:mg),
     }
@@ -23,6 +24,14 @@ Available actions: #{handlers.keys.join(", ")}"
 
 def lg(action, args)
     sh("git log --decorate --graph --oneline '#{args.join(" ")}'")
+end
+
+def ft(action, args)
+    tid = input("Enter the Jira ID")
+    if tid =~ /^\d+$/ then tid = "IOS-#{tid}" end
+    title = input("Enter the title")
+    title = title.gsub(/[^\d\w]/, '_')
+    sh("git checkout -b #{tid}_#{title}")
 end
 
 require "tempfile"
