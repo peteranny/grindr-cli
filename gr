@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+require "tempfile"
+
 END {
     handlers = {
         "lg" => method(:lg),
@@ -34,21 +36,24 @@ def ft(action, args)
     sh("git checkout -b #{tid}_#{title}")
 end
 
-require "tempfile"
-
 def pr(action, args)
     description = nil
     file = Tempfile.new
     begin
         branch = `git branch --show-current`.chomp
-        matched = branch.match(/^(T\d+)(.*)$/)
+        matched = branch.match(/^(T\d+|IOS-\d+)_(.*)$/)
         tid, title = matched.nil? ? ["", ""] : matched.captures
+        if tid =~ /^T\d+$/ then
+            ticket_type = :phabricator
+        elsif tid =~ /^IOS-\d+$/ then
+            ticket_type = :jira
+        end
         title = title.gsub(/[_\[\]]/, " ").gsub(/ (\w)/) { " #{$1.upcase}" }.strip
         File.write(file.path, "[#{tid}] #{title}
 
 # Description:
 
-[Phabricator Ticket](https://grindr.phacility.com/#{tid})
+[#{ticket_type == :phabricator ? "Phabricator Ticket" : ticket_type == :jira ? "Jira Ticket" : ""}](#{ticket_type == :phabricator ? "https://grindr.phacility.com/#{tid}" : ticket_type == :jira ? "https://grindr.atlassian.net/browse/#{tid}" : ""})
 
 Please include a summary of the change and which issue is fixed. 
 
@@ -74,7 +79,7 @@ Please describe the tests that you ran to verify your changes. Provide instructi
             description = File.read(file.path)
             title = description.lines.first.chomp
             description = description.lines.to_a[2..-1].join.chomp
-            break if title =~ /^\[T\d+\].*$/
+            break if title =~ /^\[(T\d+|IOS-\d+)\]/
             exit 1 if input("Mismatched title format. Edit again? (default: true)", optional: true) =~ /^[Nn]([oO])?$/
         end
     ensure
@@ -89,6 +94,7 @@ end
 def mg(action, args)
     sh("gh pr merge -s")
     sh("git pull")
+    sh("git remote update -p")
 end
 
 def sh(cmd)
