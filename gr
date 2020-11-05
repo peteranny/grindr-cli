@@ -90,7 +90,7 @@ Please describe the tests that you ran to verify your changes. Provide instructi
     branches = `git remote update -p && git for-each-ref --format='%(refname:short)' git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/*`.split("\n").reject do |br| br =~ /^release/ end
     base = choice("Please choose the target branch", branches)
 
-    sh("gh pr create --base '#{base}' --title '#{title}' --body='#{description.sub(/'/, '"')}'")
+    sh("gh pr create --base '#{base}' --title '#{title}' --body='#{description.sub(/'/, "'\"'\"'")}'")
 end
 
 def mg(action, args)
