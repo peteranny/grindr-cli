@@ -8,6 +8,8 @@ END {
         "ft" => method(:ft),
         "pr" => method(:pr),
         "mg" => method(:mg),
+        "sync" => method(:sync),
+        "rebase" => method(:rebase),
     }
 
     action, *args = *ARGV
@@ -29,10 +31,27 @@ def lg(action, args)
 end
 
 def ft(action, args)
-    tid = input("Enter the Jira ID")
+    tid, = args
+    puts "You're creating a feature from `#{`git branch --show-current`.chomp}`"
+
+    # Complete meta information
+    if tid.nil? then
+        tid = input("Enter the Jira ID")
+    end
     if tid =~ /^\d+$/ then tid = "IOS-#{tid}" end
     title = input("Enter the title")
     title = title.gsub(/[^\d\w]/, '_')
+
+    # Select base branch
+    branches = remote_branches
+    base = branches.sort_by { |br| `git rev-list --count origin/#{br}..head`.to_i }.first
+    if base.nil? or !(input("Is your base branch `#{base}`?") =~ /^[Yy]/) then
+        base = choice("Please choose the target branch", branches, default: `git branch --show-current`.chomp)
+    end
+
+    # Checking out
+    sh("git checkout #{base}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull")
     sh("git checkout -b #{tid}_#{title}")
 end
 
@@ -40,20 +59,23 @@ def pr(action, args)
     description = nil
     file = Tempfile.new
     begin
+        # Select base branch
+        branches = remote_branches
+        base = branches.sort_by { |br| `git rev-list --count origin/#{br}..head`.to_i }.first
+        if base.nil? or !(input("Is your base branch `#{base}`?") =~ /^[Yy]/) then
+            base = choice("Please choose the target branch", branches)
+        end
+
+        # Complete meta information
         branch = `git branch --show-current`.chomp
         matched = branch.match(/^(T\d+|IOS-\d+)_(.*)$/)
         tid, title = matched.nil? ? ["", ""] : matched.captures
-        if tid =~ /^T\d+$/ then
-            ticket_type = :phabricator
-        elsif tid =~ /^IOS-\d+$/ then
-            ticket_type = :jira
-        end
         title = title.gsub(/[_\[\]]/, " ").gsub(/ (\w)/) { " #{$1.upcase}" }.strip
         File.write(file.path, "[#{tid}] #{title}
 
 # Description:
 
-[#{ticket_type == :phabricator ? "Phabricator Ticket" : ticket_type == :jira ? "Jira Ticket" : ""}](#{ticket_type == :phabricator ? "https://grindr.phacility.com/#{tid}" : ticket_type == :jira ? "https://grindr.atlassian.net/browse/#{tid}" : ""})
+[#{tid}]
 
 Please include a summary of the change and which issue is fixed. 
 
@@ -69,34 +91,87 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 
 # Checklist:
 
-- [] I have performed a self-review of my own code
-- [] I have commented my code, particularly in hard-to-understand areas
-- [] I have made corresponding changes to the documentation
-- [] My changes generate no new warnings")
+- [x] I have performed a self-review of my own code
+- [x] I have commented my code, particularly in hard-to-understand areas
+- [x] I have made corresponding changes to the documentation
+- [x] My changes generate no new warnings")
 
         loop do
             sh("vim #{file.path}")
             description = File.read(file.path)
-            title = description.lines.first.chomp
-            description = description.lines.to_a[2..-1].join.chomp
+            title = description.lines.first
+            description = description.lines.to_a[2..-1].join
             break if title =~ /^\[(T\d+|IOS-\d+)\]/
-            exit 1 if input("Mismatched title format. Edit again? (default: true)", optional: true) =~ /^[Nn]([oO])?$/
+            exit 1 if input("Mismatched title format. Edit again?", optional: true) =~ /^[Nn]([oO])?$/
         end
     ensure
         file.close
         file.unlink
     end
 
-    branches = `git remote update -p && git for-each-ref --format='%(refname:short)' git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/*`.split("\n").reject do |br| br =~ /^release/ end
-    base = choice("Please choose the target branch", branches)
-
-    sh("gh pr create --base '#{base}' --title '#{title}' --body='#{description.sub(/'/, "'\"'\"'")}'")
+    sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'")
 end
 
 def mg(action, args)
-    sh("gh pr merge -s")
-    sh("git pull")
+    sh("gh pr merge -s && [ $? != 0 ] && exit 1; git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
     sh("git remote update -p")
+end
+
+def sync(action, args)
+    target, = args
+    branches = remote_branches
+    if not branches.include?(target) then
+        target = choice("Please choose the target branch", branches)
+    end
+    current = `git branch --show-current`.chomp
+    sh("git checkout #{target}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+    sh("git checkout #{current}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+
+    success = false
+    begin
+        sh("git merge #{target}")
+        success = true
+    rescue
+        puts("Command failed. You can:
+1. Fix it and continue with
+   $ git merge --continue
+
+2. Abort the action with
+   $ git merge --abort")
+    end
+
+    sh("git push") if success and current != target and input("Push?", optional: true) =~ /^[Yy]/
+end
+
+def rebase(action, args)
+    target, = args
+    branches = remote_branches
+    if not branches.include?(target) then
+        target = choice("Please choose the target branch", branches)
+    end
+
+    current = `git branch --show-current`.chomp
+    earliest_ancestor = `git merge-base #{current} #{target}`.chomp
+    ancestors = `git log --oneline --reverse #{earliest_ancestor}..#{current}`.split("\n")
+    if ancestors.empty? then
+        return
+    end
+    base_ancestor = choice("From what commit do you want to rebase to #{target}?", ancestors, default: ancestors.first[0, 10])[0, 10]
+
+    sh("git checkout #{target}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+
+    sh("git checkout #{current}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+
+    sh("git rebase --onto=#{target} #{base_ancestor}~")
+end
+
+def remote_branches
+    sh("git remote update -p")
+    `git for-each-ref --format='%(refname:short)' git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/* | grep -v '^release' | grep -v '^HEAD$'`.split("\n")
 end
 
 def sh(cmd)
@@ -117,10 +192,11 @@ end
 
 require "highline"
 
-def choice(title, choices)
+def choice(title, choices, default: nil)
     HighLine.new.choose do |menu|
         menu.shell = true
-        menu.prompt = "#{title} (enter the option itself or its number): "
+        menu.prompt = "#{title} (enter the option itself or its number#{default.nil? ? "" : ", or press Enter directly for default value '#{default}'"}): "
+        menu.default = default
         menu.choices(*choices)
     end
 end
