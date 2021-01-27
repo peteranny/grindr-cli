@@ -60,14 +60,16 @@ def pr(action, args)
     file = Tempfile.new
     begin
         # Select base branch
+        branch = `git branch --show-current`.chomp
+        sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+
         branches = remote_branches
-        base = branches.sort_by { |br| `git rev-list --count origin/#{br}..head`.to_i }.first
+        base = branches.sort_by { |br| `git rev-list --count origin/#{br}..head`.to_i }.reject { |br| br == branch }.first
         if base.nil? or !(input("Is your base branch `#{base}`?") =~ /^[Yy]/) then
             base = choice("Please choose the target branch", branches)
         end
 
         # Complete meta information
-        branch = `git branch --show-current`.chomp
         matched = branch.match(/^(T\d+|IOS-\d+)_(.*)$/)
         tid, title = matched.nil? ? ["", ""] : matched.captures
         title = title.gsub(/[_\[\]]/, " ").gsub(/ (\w)/) { " #{$1.upcase}" }.strip
@@ -92,10 +94,11 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 # Checklist:
 
 - [x] I have performed a self-review of my own code
-- [x] I have commented my code, particularly in hard-to-understand areas
+- [x] I have commented on my code, particularly in hard-to-understand areas
+- [x] Performed thorough QA on my own code
 - [x] I have made corresponding changes to the documentation
-- [x] My changes generate no new warnings")
-
+- [x] My changes generate no new warnings
+""")
         loop do
             sh("vim #{file.path}")
             description = File.read(file.path)
@@ -113,7 +116,10 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 end
 
 def mg(action, args)
-    sh("gh pr merge -s && [ $? != 0 ] && exit 1; git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+    puts "You're merging `#{`git branch --show-current`.chomp}`"
+    return unless input("Have you performed tests?") =~ /^[Yy]/
+    sh("gh pr merge -s")
+    sh("[ $? != 0 ] && exit 1; git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
     sh("git remote update -p")
 end
 
