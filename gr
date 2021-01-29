@@ -1,8 +1,13 @@
 #!/usr/bin/ruby
 
 require "tempfile"
+require "readline"
+require "highline"
 
 END {
+    sh("brew install gh") if `which gh`.empty?
+    sh("gh auth status")
+
     handlers = {
         "lg" => method(:lg),
         "ft" => method(:ft),
@@ -195,8 +200,6 @@ def input(msg, optional = false)
         value
     end
 end
-
-require "highline"
 
 def choice(title, choices, default: nil)
     HighLine.new.choose do |menu|
