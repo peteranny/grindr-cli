@@ -121,7 +121,7 @@ Please describe the tests that you ran to verify your changes. Provide instructi
         file.unlink
     end
 
-    draft = input("Draft?", optional: true) =~ /^[Yy]/ unless draft.empty?
+    draft = input("Draft?", optional: true) =~ /^[Yy]/
 
     sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'#{draft ? ' --draft': ''}")
 end
