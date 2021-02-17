@@ -61,6 +61,7 @@ def ft(action, args)
 end
 
 def pr(action, args)
+    draft, = args
     description = nil
     file = Tempfile.new
     begin
@@ -117,17 +118,19 @@ Please describe the tests that you ran to verify your changes. Provide instructi
         file.unlink
     end
 
-    sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'")
+    draft = input("Draft?", optional: true) =~ /^[Yy]/ unless draft.empty?
+
+    sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'#{draft ? ' --draft': ''}")
 end
 
 def mg(action, args)
-    puts "You're merging `#{`git branch --show-current`.chomp}`"
     branch = `git branch --show-current`.chomp
+    puts "You're merging `#{branch}`"
     pr_id = /^\d+/.match(`gh pr list | grep #{branch}`)
     labels = `gh pr view #{pr_id} | sed '4q;d' | grep labels`
     raise "❌ Not ready to merge; please test it before merging it" unless labels.include?('QA: Ready to Merge')
-    sh("gh pr merge -s")
-    sh("[ $? != 0 ] && exit 1; git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+    sh("gh pr merge -s -d")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
     sh("git remote update -p")
 end
 
