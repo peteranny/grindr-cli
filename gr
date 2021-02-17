@@ -55,9 +55,12 @@ def ft(action, args)
     end
 
     # Checking out
+    dirty = !`git diff head`.empty?
+    sh("git stash") if dirty
     sh("git checkout #{base}")
     sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull")
     sh("git checkout -b #{tid}_#{title}")
+    sh("git stash pop") if dirty
 end
 
 def pr(action, args)
