@@ -54,13 +54,17 @@ def ft(action, args)
         base = choice("Please choose the target branch", branches, default: `git branch --show-current`.chomp)
     end
 
+    br = "#{tid}_#{title}"
+
     # Checking out
     dirty = !`git diff head`.empty?
     sh("git stash") if dirty
     sh("git checkout #{base}")
     sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull")
-    sh("git checkout -b #{tid}_#{title}")
+    sh("git checkout -b #{br}")
     sh("git stash pop") if dirty
+
+    sh("git push --set-upstream origin #{br}") if input("Push?", optional: true) =~ /^[Yy]/
 end
 
 def pr(action, args)
