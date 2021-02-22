@@ -15,6 +15,7 @@ END {
         "mg" => method(:mg),
         "sync" => method(:sync),
         "rebase" => method(:rebase),
+        "update" => method(:update),
     }
 
     action, *args = *ARGV
@@ -191,6 +192,10 @@ def rebase(action, args)
     sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
 
     sh("git rebase --onto=#{target} #{base_ancestor}~")
+end
+
+def update(action, args)
+    sh("cd '#{File.expand_path(File.dirname(__FILE__))}' && git remote update && git reset --hard origin/master")
 end
 
 def remote_branches
