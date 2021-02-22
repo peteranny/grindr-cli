@@ -44,6 +44,7 @@ def ft(action, args)
         tid = input("Enter the Jira ID")
     end
     if tid =~ /^\d+$/ then tid = "IOS-#{tid}" end
+
     title = input("Enter the title")
     title = title.gsub(/[^\d\w]/, '_')
 
@@ -75,6 +76,10 @@ def pr(action, args)
         # Select base branch
         branch = `git branch --show-current`.chomp
         sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+
+        tid = branch.match(/^IOS-\d+/)
+        raise "❌ Not standard branch name: #{branch}" if tid.nil?
+        raise "❌ You should move it to 'In Progress' first" if !(input("Did you move the task to 'In Progress'? ( https://grindr.atlassian.net/browse/#{tid} )", optional: true) =~ /^[Yy]/)
 
         branches = remote_branches
         base = branches.sort_by { |br| `git rev-list --count origin/#{br}..head`.to_i }.reject { |br| br == branch }.first
