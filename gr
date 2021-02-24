@@ -38,7 +38,6 @@ end
 
 def ft(action, args)
     tid, = args
-    puts "You're creating a feature from `#{`git branch --show-current`.chomp}`"
 
     # Complete meta information
     if tid.nil? then
