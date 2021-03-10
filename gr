@@ -65,7 +65,7 @@ def ft(action, args)
     sh("git checkout -b #{br}")
     sh("git stash pop") if dirty
 
-    sh("git push --set-upstream origin #{br}") if input("Push?", optional: true) =~ /^[Yy]/
+    sh("git push --set-upstream origin #{br}") if input("Push? (Enter to ignore)", optional: true) =~ /^[Yy]/
 end
 
 def pr(action, args)
@@ -130,7 +130,7 @@ Please describe the tests that you ran to verify your changes. Provide instructi
         file.unlink
     end
 
-    draft = input("Draft?", optional: true) =~ /^[Yy]/
+    draft = input("Draft? (Enter to ignore)", optional: true) =~ /^[Yy]/
 
     sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'#{draft ? ' --draft': ''}")
 end
@@ -171,7 +171,7 @@ def sync(action, args)
    $ git merge --abort")
     end
 
-    sh("git push") if success and current != target and input("Push?", optional: true) =~ /^[Yy]/
+    sh("git push") if success and current != target and input("Push? (Enter to ignore)", optional: true) =~ /^[Yy]/
 end
 
 def rebase(action, args)
