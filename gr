@@ -132,7 +132,10 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 
     draft = input("Draft? (Enter to ignore)", optional: true) =~ /^[Yy]/
 
-    sh("gh pr create --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'#{draft ? ' --draft': ''}")
+    matched = /^git@github.com:(.*)\.git$/.match(`git remote get-url origin`)
+    repo, = matched.nil? ? [] : matched.captures
+
+    sh("gh pr create --repo '#{repo}' --base '#{base}' --title '#{title.chomp}' --body='#{description.chomp.gsub(/'/, "'\"'\"'")}'#{draft ? ' --draft': ''}")
 end
 
 def mg(action, args)
