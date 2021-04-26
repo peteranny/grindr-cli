@@ -5,6 +5,8 @@ require "readline"
 require "highline"
 
 END {
+    puts "\n⭐ Upgradable found! You can run `#{$0} upgrade` to upgrade your cli.\n\n" if upgradable?
+
     sh("brew install gh") if `which gh`.empty?
     sh("gh auth status")
 
@@ -15,7 +17,7 @@ END {
         "mg" => method(:mg),
         "sync" => method(:sync),
         "rebase" => method(:rebase),
-        "update" => method(:update),
+        "upgrade" => method(:upgrade),
     }
 
     action, *args = *ARGV
@@ -201,7 +203,11 @@ def rebase(action, args)
     sh("git rebase --onto=#{target} #{base_ancestor}~")
 end
 
-def update(action, args)
+def upgradable?
+    not `cd '#{File.expand_path(File.dirname(__FILE__))}' && (git remote update > /dev/null) && git diff head origin/master`.empty?
+end
+
+def upgrade(action, args)
     sh("cd '#{File.expand_path(File.dirname(__FILE__))}' && git remote update && git reset --hard origin/master")
 end
 
