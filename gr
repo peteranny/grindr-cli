@@ -17,6 +17,7 @@ END {
         "mg" => method(:mg),
         "sync" => method(:sync),
         "rebase" => method(:rebase),
+        "diff" => method(:diff),
         "upgrade" => method(:upgrade),
     }
 
@@ -201,6 +202,11 @@ def rebase(action, args)
     sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
 
     sh("git rebase --onto=#{target} #{base_ancestor}~")
+end
+
+def diff(action, args)
+    br, = args
+    sh("git diff $(git merge-base head #{br})")
 end
 
 def upgradable?
