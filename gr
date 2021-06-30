@@ -80,7 +80,7 @@ def pr(action, args)
         branch = `git branch --show-current`.chomp
         sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
 
-        tid = branch.match(/^IOS-\d+/)
+        tid = branch.match(/^\w+-\d+/)
         raise "❌ Not standard branch name: #{branch}" if tid.nil?
         raise "❌ You should move it to 'In Progress' first" if !(input("Did you move the task to 'In Progress'? ( https://grindr.atlassian.net/browse/#{tid} )", optional: true) =~ /^[Yy]/)
 
@@ -91,7 +91,7 @@ def pr(action, args)
         end
 
         # Complete meta information
-        matched = branch.match(/^(T\d+|IOS-\d+)_(.*)$/)
+        matched = branch.match(/^(T\d+|\w+-\d+)_(.*)$/)
         tid, title = matched.nil? ? ["", ""] : matched.captures
         title = title.gsub(/[_\[\]]/, " ").gsub(/ (\w)/) { " #{$1.upcase}" }.strip
         File.write(file.path, "[#{tid}] #{title}
@@ -125,7 +125,7 @@ Please describe the tests that you ran to verify your changes. Provide instructi
             description = File.read(file.path)
             title = description.lines.first
             description = description.lines.to_a[2..-1].join
-            break if title =~ /^\[(T\d+|IOS-\d+)\]/
+            break if title =~ /^\[(T\d+|\w+-\d+)\]/
             exit 1 if input("Mismatched title format. Edit again?", optional: true) =~ /^[Nn]([oO])?$/
         end
     ensure
