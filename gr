@@ -188,6 +188,10 @@ def rebase(action, args)
     end
 
     current = `git branch --show-current`.chomp
+    sh("git checkout #{target}")
+    sh("git rev-parse --abbrev-ref $(git branch --show-current)@{upstream}; [ $? == 0 ] && git pull || true")
+    sh("git checkout #{current}")
+
     earliest_ancestor = `git merge-base #{current} #{target}`.chomp
     ancestors = `git log --oneline --reverse #{earliest_ancestor}..#{current}`.split("\n")
     if ancestors.empty? then
