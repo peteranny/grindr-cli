@@ -210,6 +210,7 @@ end
 
 def diff(action, args)
     br, = args
+    br = br || "master"
     sh("git diff $(git merge-base head #{br})")
 end
 
